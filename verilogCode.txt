@@ -1,0 +1,179 @@
+module Unsigned(A, B, LT, GT, EQ);
+    input [5:0] A, B;
+    output LT, GT, EQ;
+    wire [5:0] E, W, Q, L, U;
+    wire [5:0] notB, notA;
+
+    // Equality comparison
+    xnor #(10)(E[5], A[5], B[5]);
+    xnor #(10)(E[4], A[4], B[4]);
+    xnor #(10)(E[3], A[3], B[3]);
+    xnor #(10)(E[2], A[2], B[2]);
+    xnor #(10)(E[1], A[1], B[1]);
+    xnor #(10)(E[0], A[0], B[0]);
+
+    // Generate ~B for Less Than
+    not #(4) (notB[5], B[5]);
+    not #(4) (notB[4], B[4]);
+    not #(4) (notB[3], B[3]);
+    not #(4) (notB[2], B[2]);
+    not #(4) (notB[1], B[1]);
+    not #(4) (notB[0], B[0]);
+
+    // Generate Q signals for Greater Than
+    and #(9)(Q[0], A[0], notB[0]);
+    and #(9)(Q[1], A[1], notB[1]);
+    and #(9)(Q[2], A[2], notB[2]);
+    and #(9)(Q[3], A[3], notB[3]);
+    and #(9)(Q[4], A[4], notB[4]);
+    and #(9)(Q[5], A[5], notB[5]);
+
+    // GT logic
+    and #(9)(W[5], E[5], E[4], E[3], E[2], E[1], Q[0]);
+    and #(9)(W[4], E[5], E[4], E[3], E[2], Q[1]);
+    and #(9)(W[3], E[5], E[4], E[3], Q[2]);
+    and #(9)(W[2], E[5], E[4], Q[3]);
+    and #(9)(W[1], E[5], Q[4]);
+    and #(9)(W[0], Q[5]);
+    or #(9)(GT, W[5], W[4], W[3], W[2], W[1], W[0]);
+
+    // Generate ~A for Less Than
+    not #(4) (notA[5], A[5]);
+    not #(4) (notA[4], A[4]);
+    not #(4) (notA[3], A[3]);
+    not #(4) (notA[2], A[2]);
+    not #(4) (notA[1], A[1]);
+    not #(4) (notA[0], A[0]);
+
+    // Generate U signals for Less Than
+    and #(9)(U[0], notA[0], B[0]);
+    and #(9)(U[1], notA[1], B[1]);
+    and #(9)(U[2], notA[2], B[2]);
+    and #(9)(U[3], notA[3], B[3]);
+    and #(9)(U[4], notA[4], B[4]);
+    and #(9)(U[5], notA[5], B[5]);
+
+    // LT logic
+    and #(9)(L[5], E[5], E[4], E[3], E[2], E[1], U[0]);
+    and #(9)(L[4], E[5], E[4], E[3], E[2], U[1]);
+    and #(9)(L[3], E[5], E[4], E[3], U[2]);
+    and #(9)(L[2], E[5], E[4], U[3]);
+    and #(9)(L[1], E[5], U[4]);
+    and #(9)(L[0], U[5]);
+    or #(9)(LT, L[5], L[4], L[3], L[2], L[1], L[0]);
+
+    // EQ logic
+    and #(9)(EQ, E[5], E[4], E[3], E[2], E[1], E[0]);
+endmodule
+
+module final_comparter(A, B, S, LT, GT, EQ);
+    input [5:0] A, B;
+    input S;
+    output LT, GT, EQ;
+    wire [5:0] A_signed, B_signed;
+
+    assign A_signed = (S == 1) ? (~A + 1) : A;
+    assign B_signed = (S == 1) ? (~B + 1) : B;
+
+    Unsigned comp(A_signed, B_signed, LT, GT, EQ);
+endmodule
+
+module DFF(Clk, Reset, D, Q);
+    input Clk, Reset, D;
+    output reg Q;
+
+    always @(posedge Clk or negedge Reset) begin
+        if (~Reset)
+            Q <= 0;
+        else
+            Q <= D;
+    end
+endmodule
+
+module register #(parameter n = 6)(Clk, Reset, D, Q);
+    input [n-1:0] D;
+    input Clk, Reset;
+    output reg [n-1:0] Q;
+
+    always @(posedge Clk or negedge Reset) begin
+        if (~Reset)
+            Q <= 0;
+        else
+            Q <= D;
+    end
+endmodule
+
+module Full_comparter(A, B, S, Clk, Reset, LT, GT, EQ);
+    input [5:0] A, B;
+    input S, Clk, Reset;
+    output LT, GT, EQ;
+  	wire L , G , E;
+    wire [5:0] A_reg, B_reg;
+
+    register #(6) r1(Clk, Reset, A, A_reg);
+    register #(6) r2(Clk, Reset, B, B_reg);
+    final_comparter comp1(A_reg, B_reg, S, L, G, E);
+  DFF r3(Clk, Reset, L, LT);
+  DFF r4(Clk, Reset, G, GT);
+  DFF r5(Clk, Reset, E, EQ);
+endmodule
+
+module behavioral(A, B,S,Clk,Reset, LT, GT, EQ);
+    input [5:0] A, B;
+  	input Clk,Reset,S;
+    output LT, GT, EQ;
+  	wire L , G , E;
+    wire [5:0] A_reg, B_reg,A_signed,B_signed; 
+	
+	  assign A_signed = (S == 1) ? (~A + 1) : A;
+    assign B_signed = (S == 1) ? (~B + 1) : B;
+
+  
+  	register #(6) r1(Clk, Reset, A_signed, A_reg);
+    register #(6) r2(Clk, Reset, B_signed, B_reg);
+    assign L = (A_reg < B_reg) ? 1 : 0;
+    assign G = (A_reg > B_reg) ? 1 : 0;
+    assign E = (A_reg == B_reg) ? 1 : 0;
+  DFF r3(Clk, Reset, L, LT);
+  DFF r4(Clk, Reset, G, GT);
+  DFF r5(Clk, Reset, E, EQ);
+endmodule
+module test_circuit;
+    parameter n = 6;
+    reg [n-1:0] A, B;
+    reg S, Clk , Reset;
+    wire LT, GT, EQ,L,G,E;
+  reg [8:0]T ;
+  
+    Full_comparter kk(A, B, S, Clk, Reset, LT, GT, EQ);
+	behavioral  yy(A, B,S,Clk, Reset, L, G, E);
+  
+  initial begin
+     Clk =0;
+     forever #15.5 Clk = ~Clk;
+  end
+
+    initial begin
+      T =0;
+      $monitor("time = %0d | A = %d | B = %d | E = %d | G = %d | L = %d ", $time,A,B,EQ,GT,LT);
+		  
+        A = 0;
+        B = 0;
+        S = 0;
+		Reset =1;
+      repeat(4096) begin
+        #31
+        {A,B} = {A,B} + 1;
+        if((L != LT) || (G != GT) || (E != EQ))
+          T =T +1;
+      end
+      
+      if(T)
+        $display("Fail Number of errors %d ",T);
+        else 
+          $display("Pass");
+       
+      
+    #400 $finish;
+    end
+endmodule
