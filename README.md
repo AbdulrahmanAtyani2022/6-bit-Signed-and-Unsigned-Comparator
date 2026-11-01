@@ -130,9 +130,3 @@ Or load the file in any Verilog simulator (ModelSim, QuestaSim, Vivado, EDA Play
 - The design could be extended to a parameterized N-bit comparator and used as a building block inside a simple ALU.
 
 ---
-
-## Author
-
-**Abdulrahman Atyani**
-Birzeit University – Electrical & Computer Engineering
-Instructor: Dr. Abdullatef Abu Issa
